@@ -7,7 +7,6 @@
 #include <LittleFS.h>
 #include <NTPClient.h>
 #include <SPI.h>
-#include <Time.h>
 #include <WiFiClient.h>
 #include <WiFiUdp.h>
 
@@ -20,13 +19,40 @@
 ESP8266WebServer server(80);
 DHT dht(DHTPIN, DHTTYPE);
 WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP);
+NTPClient timeClient(ntpUDP, "pool.ntp.org");
 
 const char *ssid = "Verizon_NQ6GYX";
 const char *password = "adverb-fee7-jug";
 const char *t = "/data/temp.txt";
 const char *b = "/data/batt.txt";
-const char timeServer[] = "time.nist.gov";
+
+long tempInterval = 5000;
+
+long prevTempMillis = 0;
+
+
+class Timer
+{
+
+long interval;
+long prevMillis = 0;
+
+public:
+Timer(long intv){
+  interval = intv;
+  prevMillis = 0;
+
+}
+void Update(void (*function)())
+{
+  unsigned long currentMillis = millis();
+  if (currentMillis - prevMillis >= interval){
+    prevMillis = currentMillis;
+    (*function)();
+  }
+}
+};
+
 
 void readFile(const char *path) {
   Serial.printf("\nReading file: %s\n", path);
@@ -89,6 +115,9 @@ void getBattery() {
   appendFile(b, "\n");
 }
 
+Timer battery(100000);
+Timer temp(30000);
+
 void setup() {
   Serial.begin(115200);
   delay(10000);
@@ -106,7 +135,7 @@ void setup() {
   // Get current time
   Serial.print("\nCurrent time: ");
   timeClient.begin();
-  timeClient.update();
+  timeClient.setTimeOffset(-14400);
   Serial.print(timeClient.getFormattedTime());
   Serial.print(" - ");
   Serial.print(String(timeClient.getEpochTime(), DEC));
@@ -143,20 +172,7 @@ void setup() {
 };
 
 void loop() {
-  delay(20000);
+  battery.Update(getBattery);
+  temp.Update(getTemp);
 
-  // getTemp();
-  // readFile(t);
-  // getBattery();
-  // readFile(b);
-  Serial.print("\nNOW:");
-  Serial.print(timeClient.getDay());
-  Serial.print(":");
-  Serial.print(timeClient.getHours());
-  Serial.print(":");
-  Serial.print(timeClient.getMinutes());
-  Serial.print(":");
-  Serial.print(timeClient.getSeconds());
-  Serial.print(" - ");
-  Serial.print(timeClient.getEpochTime());
 };
