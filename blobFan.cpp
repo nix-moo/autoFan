@@ -10,21 +10,18 @@
 #include <uri/UriBraces.h>
 #include <WiFiClient.h>
 #include <WiFiUdp.h>
-
+#include "config.h"
 #include "DHT.h"
 #include "index.h"
 
-#define HOSTNAME "hostname"
 #define DHTPIN 14
 #define DHTTYPE DHT22
 
 ESP8266WebServer server(80);
 DHT dht(DHTPIN, DHTTYPE);
 WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, "pool.ntp.org", -14400, 60000);
+NTPClient timeClient(ntpUDP, "us.pool.ntp.org", -14400, 60000);
 
-const char *ssid = "Verizon_NQ6GYX";
-const char *password = "adverb-fee7-jug";
 const char *t = "/temp.txt";
 const char *b = "/batt.txt";
 // const char *f = "/fan.txt";
@@ -54,11 +51,11 @@ public:
 
 
 void readFile(const char *path) {
-  Serial.printf("\nReading file: %s\n", path);
+  // Serial.printf("\nReading file: %s\n", path);
 
   File file = LittleFS.open(path, "r");
   if (!file) {
-    Serial.println("\nFailed to open file for reading");
+    // Serial.println("\nFailed to open file for reading");
     return;
   }
   while (file.available()) { Serial.write(file.read()); }
@@ -69,12 +66,12 @@ void printFile(const String path) {
   String fn = "/";
   File file = LittleFS.open(fn + path, "r");
   if (!file) {
-    Serial.println("\nFailed to open file for reading");
+    // Serial.println("\nFailed to open file for reading");
     return;
   }
   while (file.available()) {
     String text = file.readString();
-    Serial.print(text);
+    // Serial.print(text);
     server.sendHeader("Cache-Control", "no-cache");
     server.send(200, "text/plain; charset=utf-8", text);
   }
@@ -82,43 +79,45 @@ void printFile(const String path) {
 };
 
 void appendFile(const char *path, String message) {
-  Serial.print("\nAppending");
+  digitalWrite(0, HIGH);
+  // Serial.print("\nAppending");
 
   File file = LittleFS.open(path, "a+");
   if (!file) {
-    Serial.print(" - FAILED: file open");
+    // Serial.print(" - FAILED: file open");
     return;
   }
   if (file) {
     file.print(message);
-    Serial.print(" - SUCCESS: ");
-    Serial.print(message);
+    // Serial.print(" - SUCCESS: ");
+    // Serial.print(message);
   } else {
-    Serial.print("- FAILED: Append");
+    // Serial.print("- FAILED: Append");
   }
   file.close();
+  digitalWrite(0, LOW);
 };
 
 String getTime() {
   char buff[15];
   timeClient.update();
   sprintf(buff, "%15.0i", timeClient.getEpochTime());
-  Serial.println(buff);
-  Serial.println(timeClient.getFormattedTime());
+  // Serial.println(buff);
+  // Serial.println(timeClient.getFormattedTime());
   return String(buff);
 };
 
 void getTemp() {
-  Serial.print("\ngetTemp() - ");
+  // Serial.print("\ngetTemp() - ");
   float h = dht.readHumidity();
   float f = dht.readTemperature(true);
   delay(5000);
   if (isnan(h) || isnan(f)) {
-    Serial.print("FAILED: read from DHT sensor\n");
+    // Serial.print("FAILED: read from DHT sensor\n");
     return;
   }
   float hif = dht.computeHeatIndex(f, h, true);
-  Serial.printf("SUCCESS: %3.0f", f);
+  // Serial.printf("SUCCESS: %3.0f", f);
 
   String result = getTime();
   result += ", " + String(f) + ", " + String(h) + "\n";
@@ -156,24 +155,26 @@ void handleFiles() {
   server.send(200, "text/javascript; charset=utf-8", result);
 }  // handleListFiles()
 
-Timer battery(60000);
-Timer temp(10000);
+Timer battery(30000);
+Timer temp(30000);
 
 void setup() {
-  Serial.begin(115200);
+  // Serial.begin(115200);
   delay(5000);
 
   // Connect to wifi
-  Serial.print("\nConnecting");
-  WiFi.begin(ssid, password);
+  // Serial.print("\nConnecting");
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
   WiFi.setHostname(HOSTNAME);
   while (WiFi.status() != WL_CONNECTED) {
-    Serial.print(".");
+    // Serial.print(".");
     delay(500);
   };
 
+  pinMode(LED_BUILTIN, OUTPUT);
+
   server.on("/", []() {
-    server.send(200, "text/html", FPSTR(uploadContent));
+    server.send(200, "text/html", FPSTR(index_html));
   });
   server.on("/files", []() {
     handleFiles();
@@ -187,25 +188,25 @@ void setup() {
   dht.begin();
 
   // Get current time
-  Serial.print("\nCurrent time: ");
+  // Serial.print("\nCurrent time: ");
   timeClient.begin();
-  Serial.print(timeClient.getFormattedTime());
-  Serial.print(" - ");
-  Serial.print(getTime());
+  // Serial.print(timeClient.getFormattedTime());
+  // Serial.print(" - ");
+  // Serial.print(getTime());
 
   // Mount filesystem
-  Serial.println("\nMounting LittleFS");
+  // Serial.println("\nMounting LittleFS");
   if (!LittleFS.begin()) {
-    Serial.println(" - mount failed");
+    // Serial.println(" - mount failed");
     return;
   };
 
   // Check for log files
   if (LittleFS.exists(t)) {
-    Serial.print("\nFound temp file");
+    // Serial.print("\nFound temp file");
     readFile(t);
   } else {
-    Serial.println("\nFile not found: Creating new file");
+    // Serial.println("\nFile not found: Creating new file");
     File file = LittleFS.open(t, "a+");
     file.write("time, F, H\n");
     file.close();
@@ -213,9 +214,9 @@ void setup() {
     readFile(t);
 
     if (LittleFS.exists(b)) {
-      Serial.print("\nFound batt file");
+      // Serial.print("\nFound batt file");
     } else {
-      Serial.println("\nFile not found: Creating new file");
+      // Serial.println("\nFile not found: Creating new file");
       File battFile = LittleFS.open(b, "a+");
       battFile.write("time, raw, percent\n");
       battFile.close();
