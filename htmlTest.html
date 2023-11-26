@@ -5,16 +5,145 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>blobFan</title>
-  <script src="
+  <!-- <script src="
 https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js
-"></script>
+"></script> -->
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
   <script src="https://cdn.jsdelivr.net/npm/luxon"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon"></script>
+  <!-- <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon"></script> -->
+
 </head>
 
 <body>
-  <div style="width: 800px"><canvas id="chart"></canvas></div>
-  <script src="./chart.js"></script>
+  <div id="chart"></div>
+  <!-- <script src="./chart.js"></script> -->
+  <script type="module">
+
+    let url = (feed) => `https://io.adafruit.com/api/v2/nik_nax/feeds/${feed}/data?include=value,created_at`
+    let request = {
+      method: "GET",
+      mode: "cors",
+      headers: {
+        "X-AIO-Key": "1ecbdc80f434dd13ddb91eba2f30b8e86f6c437d"
+      },
+    }
+
+    const humid = fetch(url("humidity"), request)
+      .then(response => response.json())
+      .then(data => {
+        data.forEach(b => {
+          b.value = Number(b.value)
+        })
+        console.log(data)
+        return data
+      })
+      .catch((error) => {
+        console.error(error);
+      });
+    const temp = fetch(url("temperature"), request)
+      .then(response => response.json())
+      .then(data => {
+        data.forEach(b => {
+          b.value = Number(b.value)
+        })
+        console.log(data)
+        return data
+      })
+      .catch(error => console.error(error))
+
+    const batt = fetch(url("battery"), request)
+      .then(response => response.json())
+      .then(data => {
+        data.forEach(b => {
+          b.value = Number(b.value)
+        })
+        console.log(data)
+        return data
+      }).catch(error => console.error(error))
+
+
+    function renderChart(humid, batt, temp) {
+      console.log(humid)
+      const width = 928;
+      const height = 500;
+      const margin = {
+        left: 20,
+        bottom: 20,
+        right: 60,
+        top: 10,
+      }
+      let h = height - margin.bottom
+      // const yBatt = d3.scaleLinear([0, 100], [h, margin.top]);
+      // const tTemp = d3.scaleLinear(d3.extent(temp, t => t.value), [h, margin.top]);
+      const yHumid = d3.scaleLinear(d3.extent(humid, h => h.value), [h, margin.top]);
+
+      // const hArea = d3.area()
+      //   .defined(d => !isNaN(d.value))
+      //   .x(d => x(d.created_at))
+      //   .y0(y(0))
+      //   .y1(d => y(d.value));
+
+      // const ybAxis = d3.axisRight().scale(yBatt);
+      // const ytAxis = d3.axisLeft().scale(yTemp);
+
+      const x = d3.scaleUtc()
+        .domain(d3.extent(humid, h => h.created_at))
+        .range([margin.left, width - margin.right]);
+
+      const line = d3.line()
+        .defined(d => !isNaN(d.value.valueOf()))
+        .x(d => x(d.created_at))
+        .y(d => yHumid(d.value));
+
+      const svg = d3.create("svg")
+        .attr("width", width)
+        .attr("height", height)
+        .attr("viewBox", [0, 0, width, height])
+        .attr("style", "max-width: 100%; height: auto;");
+
+      svg.append("g")
+        .attr("transform", `translate(0,${h})`)
+        .call(d3.axisBottom(x).ticks(width / 80).tickSizeOuter(0));
+
+      svg.append("g")
+        .attr("transform", `translate(${margin.left},0)`)
+        .call(d3.axisLeft(yHumid))
+        .call(g => g.select(".domain").remove())
+        .call(g => g.selectAll(".tick line").clone()
+          .attr("x2", width - margin.left - margin.right)
+          .attr("stroke-opacity", 0.1))
+
+      svg.append("path")
+        .attr("fill", "none")
+        .attr("stroke", "steelblue")
+        .attr("stroke-width", 1.5)
+        .attr("d", line(humid.filter(d => !isNaN(d.value))));
+
+      // svg.append("path")
+      //   .attr("fill", "none")
+      //   .attr("stroke", "gray")
+      //   .attr("stroke-width", 1.5)
+      //   .attr("d", line(humid));
+
+      // svg.append("path")
+      //   .attr("fill", "lightblue")
+      //   .attr("created_at", hArea(humid));
+
+      return svg.node();
+    }
+
+    async function getData() {
+      let h = await humid;
+      console.log(h);
+      let t = await temp;
+      console.log(t);
+      let b = await batt;
+      console.log(b);
+      let svgNode = renderChart(h, b, t);
+      chart.append(svgNode)
+    }
+    getData();
+  </script>
 </body>
 
 </html>

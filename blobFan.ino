@@ -53,13 +53,10 @@ void getBattery() {
 
 void toggleFan() {
   digitalWrite(FANBLUE, HIGH);
-  Serial.println("ON");
   int blueValue = digitalRead(FANBLUE);
   fan->save(blueValue);
   delay(10000);
-
   digitalWrite(FANBLUE, LOW);
-  Serial.println("OFF");
   blueValue = digitalRead(FANBLUE);
   fan->save(blueValue);
   delay(1000);
